@@ -14,7 +14,7 @@ MCP_PORT = int(os.environ.get('MCP_PORT', '3457'))
 CALDAV_URL = 'https://caldav.icloud.com'
 def get_calendar_client():
  if not ICLOUD_USERNAME or not ICLOUD_PASSWORD:
-     raise Exception("Missing iCloud credentials")
+ raise Exception("Missing iCloud credentials")
  client = caldav.DAVClient(url=CALDAV_URL, username=ICLOUD_USERNAME, password=ICLOUD_PASSWORD)
  return client
 
