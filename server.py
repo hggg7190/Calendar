@@ -12,7 +12,6 @@ ICLOUD_USERNAME = os.environ.get('ICLOUD_USERNAME', '')
 ICLOUD_PASSWORD = os.environ.get('ICLOUD_APP_PASSWORD', '')
 MCP_PORT = int(os.environ.get('MCP_PORT', '3457'))
 CALDAV_URL = 'https://caldav.icloud.com'
-
 def get_calendar_client():
  if not ICLOUD_USERNAME or not ICLOUD_PASSWORD:
  raise Exception("Missing iCloud credentials")
@@ -47,22 +46,14 @@ def search_events(start_date=None, end_date=None, keyword=None):
  location = str(component.get('location', ''))
  description = str(component.get('description', ''))
  uid = str(component.get('uid', ''))
- results.append({
- 'uid': uid,
- 'summary': summary,
- 'start': start.isoformat() if isinstance(start, datetime) else str(start),
- 'end': end.isoformat() if isinstance(end, datetime) else str(end),
- 'location': location,
- 'description': description
- })
+ results.append({'uid': uid, 'summary': summary, 'start': start.isoformat() if isinstance(start, datetime) else str(start), 'end': end.isoformat() if isinstance(end, datetime) else str(end), 'location': location, 'description': description})
  return results
 
 def get_events_by_range(days_from_now=0, days_count=1):
  start = datetime.now(pytz.UTC) + timedelta(days=days_from_now)
  end = start + timedelta(days=days_count)
  return search_events(start_date=start, end_date=end)
-
-def create_event(summary, start_time, end_time=None, location='', description=''):
+ def create_event(summary, start_time, end_time=None, location='', description=''):
  calendar = get_primary_calendar()
  if isinstance(start_time, str):
  start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
@@ -120,14 +111,7 @@ def get_reminders():
  except:
  continue
  return reminders
-
-MCP_TOOLS = [
- {"name": "get_events", "description": "Get calendar events for a specific date range", "inputSchema": {"type": "object", "properties": {"days_from_now": {"type": "integer", "description": "Days offset from today"}, "days_count": {"type": "integer", "description": "Number of days to fetch"}}}},
- {"name": "search_events", "description": "Search calendar events by keyword", "inputSchema": {"type": "object", "properties": {"keyword": {"type": "string", "description": "Keyword to search"}, "days_from_now": {"type": "integer"}, "days_count": {"type": "integer"}}, "required": ["keyword"]}},
- {"name": "create_event", "description": "Create a new calendar event", "inputSchema": {"type": "object", "properties": {"summary": {"type": "string"}, "start_time": {"type": "string"}, "end_time": {"type": "string"}, "location": {"type": "string"}, "description": {"type": "string"}}, "required": ["summary", "start_time"]}},
- {"name": "delete_event", "description": "Delete a calendar event by UID", "inputSchema": {"type": "object", "properties": {"uid": {"type": "string"}}, "required": ["uid"]}},
- {"name": "get_reminders", "description": "Get all active reminders", "inputSchema": {"type": "object", "properties": {}}}
-]
+ MCP_TOOLS = [{"name": "get_events", "description": "Get calendar events", "inputSchema": {"type": "object", "properties": {"days_from_now": {"type": "integer"}, "days_count": {"type": "integer"}}}}, {"name": "search_events", "description": "Search events", "inputSchema": {"type": "object", "properties": {"keyword": {"type": "string"}, "days_from_now": {"type": "integer"}, "days_count": {"type": "integer"}}, "required": ["keyword"]}}, {"name": "create_event", "description": "Create event", "inputSchema": {"type": "object", "properties": {"summary": {"type": "string"}, "start_time": {"type": "string"}, "end_time": {"type": "string"}, "location": {"type": "string"}, "description": {"type": "string"}}, "required": ["summary", "start_time"]}}, {"name": "delete_event", "description": "Delete event", "inputSchema": {"type": "object", "properties": {"uid": {"type": "string"}}, "required": ["uid"]}}, {"name": "get_reminders", "description": "Get reminders", "inputSchema": {"type": "object", "properties": {}}}]
 
 def handle_tool_call(tool_name, arguments):
  try:
@@ -136,10 +120,8 @@ def handle_tool_call(tool_name, arguments):
  return {"content": [{"type": "text", "text": json.dumps(events, indent=2, ensure_ascii=False)}]}
  elif tool_name == "search_events":
  keyword = arguments.get('keyword')
- days_from = arguments.get('days_from_now', 0)
- days_count = arguments.get('days_count', 30)
- start = datetime.now(pytz.UTC) + timedelta(days=days_from)
- end = start + timedelta(days=days_count)
+ start = datetime.now(pytz.UTC) + timedelta(days=arguments.get('days_from_now', 0))
+ end = start + timedelta(days=arguments.get('days_count', 30))
  events = search_events(start_date=start, end_date=end, keyword=keyword)
  return {"content": [{"type": "text", "text": json.dumps(events, indent=2, ensure_ascii=False)}]}
  elif tool_name == "create_event":
@@ -152,11 +134,10 @@ def handle_tool_call(tool_name, arguments):
  reminders = get_reminders()
  return {"content": [{"type": "text", "text": json.dumps(reminders, indent=2, ensure_ascii=False)}]}
  else:
- return {"content": [{"type": "text", "text": json.dumps({"error": f"Unknown tool: {tool_name}"})}], "isError": True}
+ return {"content": [{"type": "text", "text": json.dumps({"error": f"Unknown tool"})}], "isError": True}
  except Exception as e:
  return {"content": [{"type": "text", "text": json.dumps({"error": str(e)})}], "isError": True}
-
-class MCPHandler(http.server.BaseHTTPRequestHandler):
+ class MCPHandler(http.server.BaseHTTPRequestHandler):
  def do_POST(self):
  if self.path != '/mcp':
  self.send_error(404)
@@ -175,18 +156,17 @@ class MCPHandler(http.server.BaseHTTPRequestHandler):
  result = handle_tool_call(params.get('name'), params.get('arguments', {}))
  response = {"jsonrpc": "2.0", "id": request.get('id'), "result": result}
  else:
- response = {"jsonrpc": "2.0", "id": request.get('id'), "error": {"code": -32601, "message": f"Method not found: {method}"}}
+ response = {"jsonrpc": "2.0", "id": request.get('id'), "error": {"code": -32601, "message": "Method not found"}}
  self.send_response(200)
  self.send_header('Content-Type', 'application/json')
  self.send_header('Access-Control-Allow-Origin', '*')
  self.end_headers()
  self.wfile.write(json.dumps(response).encode('utf-8'))
  except Exception as e:
- error_response = {"jsonrpc": "2.0", "id": request.get('id') if 'request' in locals() else None, "error": {"code": -32603, "message": str(e)}}
  self.send_response(500)
  self.send_header('Content-Type', 'application/json')
  self.end_headers()
- self.wfile.write(json.dumps(error_response).encode('utf-8'))
+ self.wfile.write(json.dumps({"jsonrpc": "2.0", "error": {"code": -32603, "message": str(e)}}).encode('utf-8'))
  def do_OPTIONS(self):
  self.send_response(200)
  self.send_header('Access-Control-Allow-Origin', '*')
@@ -197,8 +177,7 @@ class MCPHandler(http.server.BaseHTTPRequestHandler):
  pass
 
 def main():
- print(f"Apple Calendar MCP Server v1.0")
- print(f"Listening on port {MCP_PORT}")
+ print(f"Apple Calendar MCP on port {MCP_PORT}")
  with socketserver.TCPServer(("", MCP_PORT), MCPHandler) as httpd:
  httpd.serve_forever()
 
